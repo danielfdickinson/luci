@@ -56,14 +56,21 @@ return view.extend({
 			L.resolveDefault(fs.exec_direct('/usr/bin/ldd', [upsmon_tool]), []).catch(function(err) {
 				throw new Error(_('Unable to run ldd: %s').format(err.message));
 			}).then(function(stdout) {
-				return (stdout.includes('libnss3.so') || stdout.includes('libssl.so'));
+				let ssl_type = 'none';
+
+				if (stdout.includes('libnss3.so')) {
+					ssl_type = 'nss';
+				} else if (stdout.includes('libssl.so')) {
+					ssl_type = 'openssl';
+				}
+				return ssl_type;
 			}),
 		])
 	},
 
 	render: function(loaded_promises) {
 		let m, s, o;
-		const have_ssl_support = loaded_promises[0];
+		const ssl_support_type = loaded_promises[0];
 
 		m = new form.Map('nut_monitor', _('NUT Monitor'),
 			_('Network UPS Tools Monitoring Configuration'));
@@ -112,15 +119,48 @@ return view.extend({
 		o.optional = true;
 		o.placeholder = 15;
 
-		if (have_ssl_support) {
-			o = s.option(form.Value, 'certpath', _('CA Certificate path'), _('Path containing ca certificates to match against host certificate'));
+		if (ssl_support_type == 'openssl') {
+			o = s.option(form.FileUpload, 'certfile', _('Server certificate chain and private key'), _('PEM file containing server certificate chain and private key (OpenSSL)'));
+			o.rmempty = true;
 			o.optional = true;
-			o.placeholder = '/etc/ssl/certs'
 
-			o = s.option(form.Flag, 'certverify', _('Verify all connection with SSL'), _('Require SSL and make sure server CN matches hostname'));
+			o = s.option(form.FileUpload, 'certpath', _('CA certificate(s)'), _('PEM file containing the CA certificate(s) (OpenSSL)'));
+			o.rmempty = true;
+			o.optional = true;
+		}
+
+		if (ssl_support_type == 'nss') {
+			o = s.option(form.Value, 'certpath', _('Path to NSS certificate and key databases'));
+			o.optional = true;
+			o.default = '/etc/nut/cert_db';
+		}
+
+		if (ssl_support_type == 'openssl' || ssl_support_type == 'nss') {
+			o = s.option(form.Value, 'certident', _('Certificate name and password'), _('"Certificate name" and "certificate password" need to be entered in double-quotes (") if the value has as space in it. An empty password must be entered as and empty pair of double-quotes ("")'));
+			o.placeholder = '"certificate name" "certificate password"';
+			o.datatype = "tuple(string, string)"
+			o.password = true;
+
+			o = s.option(form.Flag, 'certverify', _('Verify all connection with SSL'), _('Require SSL and verify host certificate'));
 			o.optional = true;
 			o.default = false;
+			o.rmempty = false
+
+			o = s.option(form.Flag, 'forcessl', _('Require SSL to connect'), _('Require SSL even if not verifying host certificates'));
+			o.optional = true;
+			o.default = false;
+			o.rmempty = false;
+
+			o = s.option(form.DynamicList, 'certhost', _('Per-host override for certident, certverify, and forcessl'), _('hostname "certificate name" "certverify as 0 or 1" "forcessl as 0 or 1"'));
+			o.optional = true;
+			o.placeholder = 'hostname "certificate name" certverify forcessl';
+			o.datatype = "tuple(hostname, string, range(0, 1), range(0, 1))"
 		}
+
+		o = s.option(form.Value, 'debug_min', _('Minimum debug level to use'), _('The value present in reloaded configuration files is applied instantly and overrides any previously set value; a missing (or commented away) value however does not change the previously active logging verbosity'));
+		o.optional = true;
+		o.datatype = 'uinteger';
+		o.placeholder = '0';
 
 		s = m.section(form.TypedSection, 'notifications', _('Notifications settings'));
 		s.optional = true;

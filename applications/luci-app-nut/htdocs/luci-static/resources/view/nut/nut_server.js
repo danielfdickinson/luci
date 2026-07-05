@@ -28,7 +28,14 @@ return view.extend({
 			L.resolveDefault(fs.exec_direct('/usr/bin/ldd', [ups_daemon]), []).catch(function(err) {
 				throw new Error(_('Unable to run ldd: %s').format(err.message));
 			}).then(function(stdout) {
-				return (stdout.includes('libnss3.so') || stdout.includes('libssl.so'));
+				let ssl_type = 'none';
+
+				if (stdout.includes('libnss3.so')) {
+					ssl_type = 'nss';
+				} else if (stdout.includes('libssl.so')) {
+					ssl_type = 'openssl';
+				}
+				return ssl_type;
 			}),
 			resolveDriverList(driver_path),
 			resolveDriverList(old_driver_path),
@@ -37,7 +44,7 @@ return view.extend({
 
 	render: function(loaded_promises) {
 		let m, s, o;
-		const have_ssl_support = loaded_promises[0];
+		const ssl_support_type = loaded_promises[0];
 		const driver_list = (loaded_promises[1].length > 0) ? loaded_promises[1] : loaded_promises[2];
 
 		m = new form.Map('nut_server', _('NUT Server'),
@@ -108,11 +115,42 @@ return view.extend({
 		o.datatype = 'uinteger'
 		o.placeholder = 24;
 
-		if (have_ssl_support) {
-			o = s.option(form.FileUpload, 'certfile', _('Certificate file (SSL)'));
+		if (ssl_support_type == 'openssl') {
+			o = s.option(form.FileUpload, 'certfile', _('Server certificate chain and private key'), _('PEM file containing server certificate chain and private key (OpenSSL)'));
+			o.rmempty = true;
+			o.optional = true;
+
+			o = s.option(form.FileUpload, 'certpath', _('CA certificate(s)'), _('PEM file containing the CA certificate(s) (OpenSSL)'));
 			o.rmempty = true;
 			o.optional = true;
 		}
+
+		if (ssl_support_type == 'nss') {
+			o = s.option(form.Value, 'certpath', _('Path to NSS certificate and key databases'));
+			o.default = '/etc/nut/cert_db';
+		}
+
+		if (ssl_support_type == 'openssl' || ssl_support_type == 'nss') {
+			o = s.option(form.Value, 'certident', _('"certificate name" "certificate password"'), _('"Certificate name" and "certificate password" need to be entered in double-quotes (") if the value has as space in it'));
+			o.placeholder = '"certificate name" "certificate password"';
+			o.datatype = "tuple(string, string)"
+			o.password = true;
+
+			o = s.option(form.ListValue, 'certrequest', _('Certificate request level'), _('Whether to request a client certificate and whether to validate a requested client certifcte'));
+			o.value('0', _('NO (do not request or verify a client certificate'));
+			o.value('1', _('REQUEST (any client certificate)'));
+			o.value('2', _('REQUIRE (and verify)'));
+
+			o = s.option(form.Flag, 'disable_weak_ssl', _('Disable weak SSL'), _('Require at least TLSv1.2 for SSL communications'));
+			o.rmempty = false;
+			o.optional = false;
+			o.default = true;
+		}
+
+		o = s.option(form.Value, 'debug_min', _('Minimum debug level to use'), _('The value present in reloaded configuration files is applied instantly and overrides any previously set value; a missing (or commented away) value however does not change the previously active logging verbosity'));
+		o.optional = true;
+		o.datatype = 'uinteger';
+		o.placeholder = '0';
 
 		// Drivers global settings
 		s = m.section(form.NamedSection, 'driver_global', 'driver_global', _('Driver Global Settings'));
