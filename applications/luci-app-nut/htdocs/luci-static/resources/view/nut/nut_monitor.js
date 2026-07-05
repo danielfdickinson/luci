@@ -2,6 +2,7 @@
 'require form';
 'require fs';
 'require view';
+'require tools.widgets as widgets';
 
 const upsmon_tool = '/usr/sbin/upsmon';
 
@@ -14,7 +15,6 @@ function ESIFlags(o) {
 	o.optional = true;
 	return o;
 }
-
 
 function MonitorUserOptions(s) {
 		let o
@@ -71,6 +71,12 @@ return view.extend({
 		s = m.section(form.NamedSection, 'upsmon', 'upsmon', _('Global Settings'));
 		s.addremove = true;
 		s.optional = true;
+
+		o = s.option(widgets.NetworkSelect, 'triggerlist', _('Trigger Interfaces'), _('Restart on changes to these interfaces'));
+		o.loopback = false;
+		o.multiple = true;
+		o.optional = true;
+		o.nocreate = true;
 
 		o = s.option(form.Value, 'runas', _('RunAs User'), _('upsmon drops privileges to this user'));
 		o.placeholder = 'nutmon'

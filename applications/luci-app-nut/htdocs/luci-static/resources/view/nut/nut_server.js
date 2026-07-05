@@ -2,6 +2,7 @@
 'require form';
 'require fs';
 'require view';
+'require tools.widgets as widgets';
 
 const driver_path = '/usr/libexec/nut/';
 const old_driver_path = '/lib/nut/';
@@ -115,6 +116,12 @@ return view.extend({
 		// Drivers global settings
 		s = m.section(form.NamedSection, 'driver_global', 'driver_global', _('Driver Global Settings'));
 		s.addremove = true;
+
+		o = s.option(widgets.NetworkSelect, 'triggerlist', _('Trigger Interfaces'), _('Restart on changes to these interfaces'));
+		o.loopback = false;
+		o.multiple = true;
+		o.optional = true;
+		o.nocreate = true;
 
 		o = s.option(form.Value, 'chroot', _('chroot'), _('Run drivers in a chroot(2) environment'));
 		o.optional = true;
