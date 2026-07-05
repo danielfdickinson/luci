@@ -82,7 +82,7 @@ return view.extend({
 
 		o = s.option(form.Value, 'shutdowncmd', _('Shutdown command'));
 		o.optional = true;
-		o.placeholder = '/sbin/halt'
+		o.placeholder = '/usr/sbin/nutshutdown'
 
 		o = s.option(form.Value, 'notifycmd', _('Notify command'));
 		o.optional = true;
